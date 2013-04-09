@@ -9,6 +9,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#include <limits.h>
+
 #include "mm.h"
 #include "memlib.h"
 
@@ -456,7 +458,41 @@ static void place(void *bp, size_t asize)
  */
 static void *find_fit(size_t asize)
 {
-// TODO: next fit call SegFault
+	/* Decide when to use best-fit */
+	if (asize > 16 * CHUNKSIZE) {
+#define BEST_FIT
+
+#ifdef BEST_FIT
+	/* best fit */
+	void *bp;
+	void *min_p = NULL;
+	size_t best_size = INT_MAX;
+	
+	for (bp = heap_listp;
+		GET_SIZE(HDRP(bp)) > 0;
+		bp = GET_PTR(NEXT_FREE_BLK(bp))) {
+		if (asize <= GET_SIZE(HDRP(bp)) && bp != heap_listp) {
+			if (asize == GET_SIZE(HDRP(bp))) {
+				min_p = bp;
+				return min_p;
+			}
+			else {
+				if (min_p == NULL || GET_SIZE(HDRP(bp)) < best_size) {
+					min_p = bp;
+					best_size = GET_SIZE(HDRP(bp));
+				}
+			}
+		}
+	}
+	return min_p;
+	/* end best fit */
+#endif
+	}
+    else {
+#define NEXT_FIT
+	}
+
+
 #ifdef NEXT_FIT 
 	/* Next fit search */
     char *oldrover = rover;
@@ -478,23 +514,50 @@ static void *find_fit(size_t asize)
 	}
 	
 	return NULL;  /* no fit found */
-	
-#else 
-/* $begin mmfirstfit */
-    /* First fit search */
-    void *bp;
-
-    for (bp = heap_listp; 
-		GET_SIZE(HDRP(bp)) > 0; 
-		bp = GET_PTR(NEXT_FREE_BLK(bp))) {
-		if (asize <= GET_SIZE(HDRP(bp)) && bp != heap_listp) {
-			return bp;
-        }
-    }
-	
-    return NULL; /* No fit */
-/* $end mmfirstfit */
 #endif
+
+// #ifdef BEST_FIT
+	// /* best fit */
+	// void *bp;
+	// void *min_p = NULL;
+	// size_t best_size = INT_MAX;
+	
+	// for (bp = heap_listp;
+		// GET_SIZE(HDRP(bp)) > 0;
+		// bp = GET_PTR(NEXT_FREE_BLK(bp))) {
+		// if (asize <= GET_SIZE(HDRP(bp)) && bp != heap_listp) {
+			// if (asize == GET_SIZE(HDRP(bp))) {
+				// min_p = bp;
+				// return min_p;
+			// }
+			// else {
+				// if (min_p == NULL || GET_SIZE(HDRP(bp)) < best_size) {
+					// min_p = bp;
+					// best_size = GET_SIZE(HDRP(bp));
+				// }
+			// }
+		// }
+	// }
+	// return min_p;
+	// /* end best fit */
+
+// #else
+	
+// /* $begin mmfirstfit */
+    // /* First fit search */
+    // void *bp;
+
+    // for (bp = heap_listp; 
+		// GET_SIZE(HDRP(bp)) > 0; 
+		// bp = GET_PTR(NEXT_FREE_BLK(bp))) {
+		// if (asize <= GET_SIZE(HDRP(bp)) && bp != heap_listp) {
+			// return bp;
+        // }
+    // }
+	
+    // return NULL; /* No fit */
+// /* $end mmfirstfit */
+// #endif
 }
 
 /*
@@ -766,7 +829,8 @@ static void printblock(void *bp)
 		printf("%p: header: [%d:%c] footer: [%d:%c]\n", bp, 
 			hsize, (halloc ? 'a' : 'f'), 
 			fsize, (falloc ? 'a' : 'f'));
-		printf("Next free Pointer: %p  --- Prev free pointer: %p\n",GET_PTR(NEXT_FREE_BLK(bp)),GET_PTR(PREV_FREE_BLK(bp)) );
+		printf("Next free Pointer: %p  --- Prev free pointer: %p\n",
+                    GET_PTR(NEXT_FREE_BLK(bp)),GET_PTR(PREV_FREE_BLK(bp)) );
     }
 }
 
@@ -783,7 +847,7 @@ static void checkblock(void *bp)
  * mm_checkheap
  */
 void mm_checkheap(int verbose) {
-    //return;
+    return;
     char *bp = heap_listp;
 	bp = bp;
 	
@@ -792,9 +856,11 @@ void mm_checkheap(int verbose) {
 	}
 	
 	/* Check rover */
+#ifdef NEXT_FIT
 	if (!GET_ALLOC(HDRP(rover))) {
 		printf("Invalid rover at %p\n", rover);
 	}
+#endif
 
 	/* Check prologue */
     if ((GET_SIZE(HDRP(heap_listp)) != MIN_BLK_SIZE) 

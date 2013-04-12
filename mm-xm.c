@@ -257,7 +257,7 @@ static void *find_fit(size_t asize)
 				}
 			}
 			
-			// reset best_size;
+			// reset best_size to next size;
 			best_size = 1 << (5 + (list + i - 1));
 		}
 		
@@ -283,11 +283,11 @@ static void *find_fit(size_t asize)
 	return NULL;
 }
 
-/* static inline void rm_free_blk(void *bp)
+static inline void rm_free_blk(void *bp)
 {
 	PUT(CURRENT_PREV_PTR(NEXT_FREE_BLKP(bp)), GET(CURRENT_PREV_PTR(bp)));
 	PUT(CURRENT_NEXT_PTR(PREV_FREE_BLKP(bp)), GET(CURRENT_NEXT_PTR(bp)));
-} */
+}
 
 /*
  * place
@@ -301,10 +301,11 @@ static void place(void *bp, size_t asize)
 	if((csize - asize) >= 16)
 	{
 		/* Remove the current block from its free list */
-		PUT(CURRENT_PREV_PTR(NEXT_FREE_BLKP(bp)),
+		/* PUT(CURRENT_PREV_PTR(NEXT_FREE_BLKP(bp)),
 				GET(CURRENT_PREV_PTR(bp)));
 		PUT(CURRENT_NEXT_PTR(PREV_FREE_BLKP(bp)),
-				GET(CURRENT_NEXT_PTR(bp)));
+				GET(CURRENT_NEXT_PTR(bp))); */
+		rm_free_blk(bp);
 
 		/*The allocated bit is set to 1*/
 		PUT(HDRP(bp), PACK(asize, previous, 1));
@@ -332,10 +333,11 @@ static void place(void *bp, size_t asize)
 	else
 	{
 		/* Remove the current block from its free list */
-		PUT(CURRENT_PREV_PTR(NEXT_FREE_BLKP(bp)),
+		/* PUT(CURRENT_PREV_PTR(NEXT_FREE_BLKP(bp)),
 				GET(CURRENT_PREV_PTR(bp)));
 		PUT(CURRENT_NEXT_PTR(PREV_FREE_BLKP(bp)),
-				GET(CURRENT_NEXT_PTR(bp)));
+				GET(CURRENT_NEXT_PTR(bp))); */
+		rm_free_blk(bp);
 
 		/* Set the allocated bit of current block */
 		PUT(HDRP(bp), PACK(csize,previous,1));
@@ -423,10 +425,11 @@ static void* coalesce(void *bp)
 		// if(list >=maxlist)
 			// list=maxlist;
 		/* Remove the next block from its free list */
-		PUT(CURRENT_PREV_PTR(NEXT_FREE_BLKP(NEXT_BLKP(bp))),
+		/* PUT(CURRENT_PREV_PTR(NEXT_FREE_BLKP(NEXT_BLKP(bp))),
 				GET(CURRENT_PREV_PTR(NEXT_BLKP(bp))));
 		PUT(CURRENT_NEXT_PTR(PREV_FREE_BLKP(NEXT_BLKP(bp))),
-				GET(CURRENT_NEXT_PTR(NEXT_BLKP(bp))));
+				GET(CURRENT_NEXT_PTR(NEXT_BLKP(bp)))); */
+		rm_free_blk(NEXT_BLKP(bp));
 
 		/* Coalesce the current and next block*/
 		PUT(HDRP(bp), PACK(size,prev_alloc,0));
@@ -454,10 +457,11 @@ static void* coalesce(void *bp)
 			// list=maxlist;
 
 		/* Remove the prev block from its free list */
-		PUT(CURRENT_PREV_PTR(NEXT_FREE_BLKP(PREV_BLKP(bp))),
+		/* PUT(CURRENT_PREV_PTR(NEXT_FREE_BLKP(PREV_BLKP(bp))),
 				GET(CURRENT_PREV_PTR(PREV_BLKP(bp))));
 		PUT(CURRENT_NEXT_PTR(PREV_FREE_BLKP(PREV_BLKP(bp))),
-				GET(CURRENT_NEXT_PTR(PREV_BLKP(bp))));
+				GET(CURRENT_NEXT_PTR(PREV_BLKP(bp)))); */
+		rm_free_blk(PREV_BLKP(bp));
 
 
 		/* Coalesce the current and prev block */
@@ -490,16 +494,18 @@ static void* coalesce(void *bp)
 		// if(list >=maxlist)
 			// list=maxlist;
 		/* Remove the next block from its free list */
-		PUT(CURRENT_PREV_PTR(NEXT_FREE_BLKP(NEXT_BLKP(bp))),
+		/* PUT(CURRENT_PREV_PTR(NEXT_FREE_BLKP(NEXT_BLKP(bp))),
 				GET(CURRENT_PREV_PTR(NEXT_BLKP(bp))));
 		PUT(CURRENT_NEXT_PTR(PREV_FREE_BLKP(NEXT_BLKP(bp))),
-				GET(CURRENT_NEXT_PTR(NEXT_BLKP(bp))));
+				GET(CURRENT_NEXT_PTR(NEXT_BLKP(bp)))); */
+		rm_free_blk(NEXT_BLKP(bp));
 
 		/* Remove the previous block from its free list */
-		PUT(CURRENT_PREV_PTR(NEXT_FREE_BLKP(PREV_BLKP(bp))),
+		/* PUT(CURRENT_PREV_PTR(NEXT_FREE_BLKP(PREV_BLKP(bp))),
 				GET(CURRENT_PREV_PTR(PREV_BLKP(bp))));
 		PUT(CURRENT_NEXT_PTR(PREV_FREE_BLKP(PREV_BLKP(bp))),
-				GET(CURRENT_NEXT_PTR(PREV_BLKP(bp))));
+				GET(CURRENT_NEXT_PTR(PREV_BLKP(bp)))); */
+		rm_free_blk(PREV_BLKP(bp));
 
 		/* Coalesce the current, prev and next block */
 		PUT(HDRP(PREV_BLKP(bp)),PACK(size,previous,0));

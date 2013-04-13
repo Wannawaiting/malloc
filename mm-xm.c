@@ -1,22 +1,8 @@
 /*
  * mm.c
- *
- * Description: 
- * I have implemented a malloc function using segregated lists
- * The segregated list was implemented using circular doubly linked lists
- * The first fit search algorithm was used to locate free blocks
- * The footers have been removed from the allocated blocks
- * When a new free block is created, it is placed in the list using LIFO policy
- * The list sizes chosen are:
- * 1) 16-31
- * 2) 32-63
- * 3) 64-127
- * 4) 128-255
- * 5) 256-511
- * 6) 512-1023
- * 7) 1023-2047
- * 8) 2048-4095
- * 9) >=4096
+ * seglist combined with best fit/first fit
+ * remove allocated block's footer
+ * use offset instead of pointer
  */
 
 #include <assert.h>
@@ -258,7 +244,7 @@ static void *find_fit(size_t asize)
 			}
 			
 			// reset best_size to next size;
-			best_size = 1 << (5 + (list + i - 1));
+			// best_size = 1 << (5 + (list + i - 1));
 		}
 		
 		return min_bp;
@@ -287,6 +273,14 @@ static inline void rm_free_blk(void *bp)
 {
 	PUT(CURRENT_PREV_PTR(NEXT_FREE_BLKP(bp)), GET(CURRENT_PREV_PTR(bp)));
 	PUT(CURRENT_NEXT_PTR(PREV_FREE_BLKP(bp)), GET(CURRENT_NEXT_PTR(bp)));
+}
+
+static inline void add_free_blk(void *bp, size_t list)
+{
+	PUT(CURRENT_NEXT_PTR(bp),GET(CURRENT_NEXT_PTR(root + 8*list)));
+	PUT(CURRENT_PREV_PTR(bp), GET(CURRENT_PREV_PTR(NEXT_FREE_BLKP(bp))));
+	PUT(CURRENT_NEXT_PTR(root + 8*list), (long)bp-(long)heapstart);
+	PUT(CURRENT_PREV_PTR(NEXT_FREE_BLKP(bp)), (long)bp-(long)heapstart);
 }
 
 /*
@@ -323,11 +317,16 @@ static void place(void *bp, size_t asize)
 		// if(list >=maxlist)
 			// list=maxlist;
 			
-		PUT(CURRENT_NEXT_PTR(bp),GET(CURRENT_NEXT_PTR(root + 8*list)));
+		// test:root's next
+		// printf("list = %d\n", (int)list);
+		// printf("root's next = %p\n", NEXT_FREE_BLKP(root + 8 * list));
+			
+		/* PUT(CURRENT_NEXT_PTR(bp),GET(CURRENT_NEXT_PTR(root + 8*list)));
 		PUT(CURRENT_PREV_PTR(bp),
 				GET(CURRENT_PREV_PTR(NEXT_FREE_BLKP(bp))));
 		PUT(CURRENT_NEXT_PTR(root + 8*list),(long)bp-(long)heapstart);
-		PUT(CURRENT_PREV_PTR(NEXT_FREE_BLKP(bp)),(long)bp-(long)heapstart);
+		PUT(CURRENT_PREV_PTR(NEXT_FREE_BLKP(bp)),(long)bp-(long)heapstart); */
+		add_free_blk(bp, list);
 	}
 	/* No splitting */
 	else
@@ -406,11 +405,14 @@ static void* coalesce(void *bp)
 		// if(list >=maxlist)
 			// list=maxlist;
 			
-		PUT(CURRENT_NEXT_PTR(bp),GET(CURRENT_NEXT_PTR(root+ 8*list)));
+		/* PUT(CURRENT_NEXT_PTR(bp),GET(CURRENT_NEXT_PTR(root+ 8*list)));
 		PUT(CURRENT_PREV_PTR(bp),
 				GET(CURRENT_PREV_PTR(NEXT_FREE_BLKP(bp))));
 		PUT(CURRENT_NEXT_PTR(root + 8*list),(long)bp-(long)heapstart);
-		PUT(CURRENT_PREV_PTR(NEXT_FREE_BLKP(bp)),(long)bp-(long)heapstart);
+		PUT(CURRENT_PREV_PTR(NEXT_FREE_BLKP(bp)),(long)bp-(long)heapstart); */
+		
+		add_free_blk(bp, list);
+		
 		RESET_PREV_ALLOC(HDRP(NEXT_BLKP(bp)));
 		return bp;
 	}
@@ -438,11 +440,13 @@ static void* coalesce(void *bp)
 		/* Put the newly coalesced block in front of the appropriate root node
 		 * depending on its size
 		 */
-		PUT(CURRENT_NEXT_PTR(bp),GET(CURRENT_NEXT_PTR(root+ 8*list)));
+		/* PUT(CURRENT_NEXT_PTR(bp),GET(CURRENT_NEXT_PTR(root+ 8*list)));
 		PUT(CURRENT_PREV_PTR(bp),
 				GET(CURRENT_PREV_PTR(NEXT_FREE_BLKP(bp))));
 		PUT(CURRENT_NEXT_PTR(root+ 8*list),(long)bp-(long)heapstart);
-		PUT(CURRENT_PREV_PTR(NEXT_FREE_BLKP(bp)),(long)bp-(long)heapstart);
+		PUT(CURRENT_PREV_PTR(NEXT_FREE_BLKP(bp)),(long)bp-(long)heapstart); */
+		add_free_blk(bp, list);
+		
 		return(bp);
 	}
 
@@ -472,14 +476,15 @@ static void* coalesce(void *bp)
 		/* Put the newly coalesced block in front of the appropriate root node
 		 * depending on its size
 		 */
-		PUT(CURRENT_NEXT_PTR(PREV_BLKP(bp)),
+		/* PUT(CURRENT_NEXT_PTR(PREV_BLKP(bp)),
 				GET(CURRENT_NEXT_PTR(root+ 8*list)));
 		PUT(CURRENT_PREV_PTR(PREV_BLKP(bp)),
 				GET(CURRENT_PREV_PTR(NEXT_FREE_BLKP(PREV_BLKP(bp)))));
 		PUT(CURRENT_NEXT_PTR(root+ 8*list),
 				(long)(PREV_BLKP(bp))-(long)heapstart);
 		PUT(CURRENT_PREV_PTR(NEXT_FREE_BLKP(PREV_BLKP(bp))),
-				(long)(PREV_BLKP(bp))-(long)heapstart);
+				(long)(PREV_BLKP(bp))-(long)heapstart); */
+		add_free_blk(PREV_BLKP(bp), list);
 
 		return(PREV_BLKP(bp));
 	}
@@ -514,14 +519,16 @@ static void* coalesce(void *bp)
 		/* Put the newly coalesced block in front of the appropriate root node
 		 * depending on its size
 		 */
-		PUT(CURRENT_NEXT_PTR(PREV_BLKP(bp)),
+		/* PUT(CURRENT_NEXT_PTR(PREV_BLKP(bp)),
 				GET(CURRENT_NEXT_PTR(root+ 8*list)));
 		PUT(CURRENT_PREV_PTR(PREV_BLKP(bp)),
 				GET(CURRENT_PREV_PTR(NEXT_FREE_BLKP(PREV_BLKP(bp)))));
 		PUT(CURRENT_NEXT_PTR(root+ 8*list),
 				(long)(PREV_BLKP(bp))-(long)heapstart);
 		PUT(CURRENT_PREV_PTR(NEXT_FREE_BLKP(PREV_BLKP(bp))),
-				(long)(PREV_BLKP(bp))-(long)heapstart);
+				(long)(PREV_BLKP(bp))-(long)heapstart); */
+		add_free_blk(PREV_BLKP(bp), list);		
+		
 		return(PREV_BLKP(bp));
 	}
 }
@@ -572,7 +579,7 @@ size_t listno(size_t asize)
  */
 
 static int in_heap(const void *p) {
-	return p <= mem_heap_hi() && p >= mem_heap_lo() && p< (void *)epilogueaddr;
+	return p <= mem_heap_hi() && p >= mem_heap_lo() && p < (void *)epilogueaddr;
 }
 
 

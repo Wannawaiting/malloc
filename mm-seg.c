@@ -1,9 +1,14 @@
 /*
  * mm.c - 64 bit Dynamic Memory Allocator
  * 
- * Design option: 
+ * Design Option: 
  *  Data structures to organize free blocks: Segregated free lists
  *  Algorithms to scan free blocks: Best fit/First fit
+ *
+ * Design Details:
+ *  (1) Block structure: 
+ *  (2) Segregated free list structure:
+ *  (3) Find fit strategy:
  *
  */
 
@@ -42,9 +47,10 @@
 #define MIN_ALLOC_SIZE  12      /* Min allocate block size (bytes) */
 
 #define MAXLIST     9           /* Max seg list index */
+#define BIGLIST     4           /* Seg list index of big size */
 
-#define IS_ALLOC    0x1         /* Current block is allocate */
 #define IS_FREE     0x0         /* Current block is free */
+#define IS_ALLOC    0x1         /* Current block is allocate */
 #define PREV_ALLOC  0X2         /* Current block's prev block is allocate */
 
 /* Doubleword (8) alignment */
@@ -85,7 +91,7 @@
 #define PREV_PTR(bp)        ((char *)(bp) + WSIZE)
 
 /* 
- * Given a block pointer bp, return addres of its next and prev free block 
+ * Given a block pointer bp, return address of its next and prev free block 
  * in the free list 
  */
 #define NEXT_FREE_BLKP(bp)  (base + (*(unsigned int *)(NEXT_PTR(bp))))
@@ -177,7 +183,7 @@ void *malloc(size_t size)
         asize = MIN_FREE_SIZE;
     }
     else {
-        asize = DSIZE * ((size + WSIZE + (DSIZE - 1)) / DSIZE);
+        asize = ALIGN(size + WSIZE);
     }
 
     /* Search free lists to find fit */
@@ -187,6 +193,8 @@ void *malloc(size_t size)
     }
     
     /* No fit found, get more memory and place the block */
+    // printf("epilogue prev free at %p\n", PREV_FREE_BLKP(epilogue));
+    
     extendsize = MAX(asize, CHUNKSIZE);
     if ((bp = extend_heap(extendsize/WSIZE)) == NULL) {
         return NULL;
@@ -247,18 +255,17 @@ static void *extend_heap(size_t words)
 static void *find_fit(size_t asize)
 {
     void *bp;
-    void *bpouter;
-    // char *startlist;
+    void *temp_list;
     size_t index = find_list(asize);
-    char *startlist = root + index * DSIZE;
+    char *cur_list = root + index * DSIZE;
 
     /* best fit */
-    if (index >= 3) {
+    if (index >= BIGLIST) {
         void *min_bp = NULL;
-        size_t best_size = 1 << (5 + (index - 1));
-        for(bpouter = startlist; bpouter != root + (MAXLIST + 1) * DSIZE; 
-            bpouter = (char *)bpouter + DSIZE) {
-            for (bp = NEXT_FREE_BLKP(bpouter); bp != bpouter; 
+        size_t best_size = MIN_FREE_SIZE * (1 << index);
+        for(temp_list = cur_list; temp_list != root + (MAXLIST + 1) * DSIZE; 
+            temp_list = (char *)temp_list + DSIZE) {
+            for (bp = NEXT_FREE_BLKP(temp_list); bp != temp_list; 
                 bp = NEXT_FREE_BLKP(bp)) {
                 if (!GET_ALLOC(HDRP(bp)) && (asize <= GET_SIZE(HDRP(bp)))) {
                     if (min_bp == NULL || GET_SIZE(HDRP(bp)) < best_size) {
@@ -274,9 +281,9 @@ static void *find_fit(size_t asize)
 
     /* first fit */
     else {
-        for (bpouter = startlist; bpouter != root + 80; 
-            bpouter = (char *)bpouter + DSIZE) {
-            for (bp = NEXT_FREE_BLKP(bpouter); bp != bpouter; 
+        for (temp_list = cur_list; temp_list != root + 80; 
+            temp_list = (char *)temp_list + DSIZE) {
+            for (bp = NEXT_FREE_BLKP(temp_list); bp != temp_list; 
                 bp = NEXT_FREE_BLKP(bp)) {
                 if (!GET_ALLOC(HDRP(bp)) && (asize <= GET_SIZE(HDRP(bp)))) {
                     return bp;

@@ -522,7 +522,7 @@ int main(int argc, char **argv)
 #endif
 
 
-        printf("Perf index = %.0f (util) & %.0f (thru) = %.0f/100\n",
+        printf("Perf index = %.3f (util) & %.0f (thru) = %.0f/100\n",
                p1*100,
                p2*100,
                perfindex);
